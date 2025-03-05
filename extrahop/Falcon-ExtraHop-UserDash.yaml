@@ -1,0 +1,171 @@
+name: 'Falcon-ExtraHop '
+updateFrequency: never
+timeSelector: {}
+sharedTimeInterval:
+  enabled: false
+  isLive: false
+  start: 1d
+widgets:
+  752a1d6c-96ce-4c47-bc97-94e2441bf7a4:
+    x: 0
+    y: 0
+    height: 2
+    queryString: |-
+      #type=falcon-raw-data
+      | UserName = ?UserName
+      | #event_simpleName = UserLogon*
+      | ipLocation(field=aip,as=FalconGeo)
+      | case { LogonType = 2 | LogonMode := "Interactive"; LogonType=10 | LogonMode := "Remote"; LogonType = 3 | LogonMode := "Network"; LogonType = 4 | LogonMode := "Batch"; LogonType = 5 | LogonMode := "Service"  }
+      | PWTimeStamp := parseTimestamp(field="PasswordLastSet",format=unixtime)
+      | PasswordLastChanged := formatTime("%Y/%m/%d %H:%M:%S", field=PWTimeStamp, locale=en_US, timezone=EST)
+      | daysSince := timestamp - PWTimeStamp
+      | DaysSincePWChange := daysSince/86400/1000
+      | math:floor(DaysSincePWChange,as=DaysSincePWChanged)
+      | table([@timestamp,LogonMode,ComputerName,FalconGeo.city,FalconGeo.state,FalconGeo.country,LocalIP,LogonDomain,DaysSincePWChanged,Entitlements],limit=1) | sort(@timestamp)
+    end: now
+    start: 1d
+    width: 8
+    options:
+      cell-overflow: wrap-text
+      configured-columns:
+        DaysSincePWChanged:
+          color:
+            defaultColor: '#126CC6FF'
+            reversePalette: false
+            thresholds:
+            - color: '#F04242FF'
+              value: 0
+            - color: '#126cc6'
+              value: 7
+            - color: '#F04242FF'
+              value: 180
+      row-numbers-enabled: false
+    visualization: table-view
+    title: Most Recent User Data
+    isLive: false
+    type: query
+  b51e8d80-df4e-4730-b13a-fe4a04440eb2:
+    x: 0
+    y: 8
+    height: 10
+    queryString: |-
+      #type=extrahop-revealx360 | "Vendor.[0].tags.source" != "extrahop:detection_update"
+      | join(query={ #type=falcon-raw-data | #event_simpleName = UserLogon | UserName = ?UserName } , field=[client.ip],key=LocalAddressIP4,include=ComputerName)
+      | splitString(by=":", field="Vendor.[0].tags.source", index=1,as=l7Proto)
+      | sankey(source=ComputerName, target=l7Proto)
+    visualization: sankey
+    end: now
+    start: 1d
+    width: 6
+    title: Protocol Breakdown by ComputerName
+    isLive: false
+    type: query
+  dccfa777-2900-4378-a55a-b2ba08652b24:
+    x: 8
+    y: 0
+    height: 4
+    queryString: |-
+      #type = extrahop-revealx360 | "Vendor.[0].tags.source" != "extrahop:detection_update"
+      | join(query={ #type=falcon-raw-data | #event_simpleName = UserLogon | UserName = ?UserName } , field=[client.ip],key=LocalAddressIP4)
+      //| join(query={ , field=[LocalAddressIP4],key=client.ip, include="Vendor.[0].tags.source") }, field=[LocalAddressIP4],key=client.ip, include="Vendor.[0].tags.source")
+      | splitString(by=":", field="Vendor.[0].tags.source", index=1,as=l7Proto)
+      | groupBy([l7Proto]) | sort()
+    end: now
+    start: 1d
+    width: 4
+    options:
+      innerRadius: 0
+      legendPosition: right
+      series: {}
+    visualization: pie-chart
+    title: Protocols Observed from Users System(s)
+    isLive: false
+    type: query
+  8884389b-e469-4702-af08-7a3a0de3a9ec:
+    x: 0
+    y: 2
+    height: 3
+    queryString: |-
+      #type=extrahop-revealx360
+      | Vendor.[0].tags.source = extrahop:kerberos_response
+      | Vendor.error != KDC_ERR_PREAUTH_REQUIRED
+      | Vendor.clientPrincipalName like ?UserName
+      | rename(field="Vendor.clientPrincipleName", as="krbUser")
+      | table([@timestamp,krbUser,source.ip,Vendor.msgType,Vendor.serverPrincipalName,Vendor.error])
+    end: now
+    start: 1d
+    width: 8
+    options:
+      cell-overflow: wrap-text
+      configured-columns: {}
+      row-numbers-enabled: false
+    visualization: table-view
+    title: Kerberos Responses
+    isLive: false
+    type: query
+  4290ccec-7d20-4f33-b357-d802d0969276:
+    x: 6
+    y: 8
+    height: 10
+    queryString: |-
+      #type=extrahop-revealx360 | "Vendor.[0].tags.source" != "extrahop:detection_update"
+      //| join(query={ #type=falcon-raw-data | #event_simpleName = UserLogon | UserName = ?UserName } , field=[client.ip],key=LocalAddressIP4,include=ComputerName)
+      | splitString(by=":", field="Vendor.[0].tags.source", index=1,as=l7Proto)
+      | sankey(source="host.ip[0]", target=l7Proto) | sort(order=desc)
+    visualization: sankey
+    end: now
+    start: 1d
+    width: 6
+    title: Average Protocol Breakdown
+    isLive: false
+    type: query
+  d88b5f05-8a25-490a-a0d9-f2de485378dc:
+    x: 8
+    y: 4
+    height: 4
+    queryString: |-
+      #type=falcon-raw-data
+      | #event_simpleName = ProcessRollup2
+      | UserName = ?UserName
+      | groupBy([FileName])
+    end: now
+    start: 1d
+    width: 4
+    options:
+      innerRadius: 0
+      legendPosition: right
+      series: {}
+    visualization: pie-chart
+    title: Processes by User Name
+    isLive: false
+    type: query
+  89e7a622-cd41-43f0-97b4-36e66eb591fa:
+    x: 0
+    y: 5
+    height: 3
+    queryString: |-
+      #type=falcon-raw-data
+      | #event_simpleName = UserLogon
+      | UserName = ?UserName
+      | sankey(source=UserName, target=ComputerName)
+    visualization: sankey
+    end: now
+    start: 1d
+    width: 8
+    title: User Access
+    isLive: false
+    type: query
+$schema: https://schemas.humio.com/dashboard/v0.18.0
+parameters:
+  UserName:
+    label: Select User Name
+    query: |-
+      #type=falcon-raw-data
+      | #event_simpleName = UserLogon*
+      | groupby([UserName])
+    timeInterval: 1d
+    useDashboardTimeIfSet: true
+    type: query
+    width: 1
+    order: 50
+    valueField: UserName
