@@ -1,0 +1,8 @@
+defineTable(query={#event_simpleName = SensorHeartbeat | rename(field="LocalIP", as="HeartBeatIP")}, include=[HeartBeatIP], name="falconInfo")
+| #event_simpleName = NetworkReceiveAcceptIP4
+| case { Protocol = "6" | ipProto := "TCP"; Protocol = "17" | ipProto := "UDP"; Protocol = 1 | ipProto := "ICMP"}
+| !match(table="falconInfo", field=[RemoteIP],column=HeartBeatIP)
+| match(file="falcon/investigate/service-names-port-numbers.csv", field=[LocalPort],include=[ServiceName],strict=false)
+| rename(field="RemoteIP", as="Unmanaged System")
+| cidr("Unmanaged System",subnet=["10.0.0.0/8","192.168.0.0/16","172.16.0.0/12","169.254.0.0/16"])
+| groupBy([ComputerName,aid,"Unmanaged System",ipProto,LocalPort,ServiceName,RemotePort],limit=max) | sort()
