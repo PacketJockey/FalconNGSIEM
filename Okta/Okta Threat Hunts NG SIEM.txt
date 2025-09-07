@@ -1,0 +1,44 @@
+--AD User Imported
+#Vendor = okta
+| Vendor.eventType = "system.agent.ad.import_user"
+
+--App Password Reveal
+#Vendor = okta
+| Vendor.eventType ="application.user_membership.show_password"
+
+--Authentication Policy Denies
+#Vendor = okta
+| Vendor.eventType = "policy.evaluate_sign_on" 
+| Vendor.outcome.result = "DENY"
+
+--Failed Identity Verification
+#Vendor = okta
+| Vendor.eventType =  "user.identity_verification" 
+| Vendor.outcome.result = "DENY"
+
+--Failed Number Challenge
+#Vendor = okta
+| Vendor.debugContext.debugData.pushWithNumberChallengeResponseType = "OV_WITH_CHALLENGE_RESPONSE_INVALID"
+
+--MFA Abandondment
+#Vendor = okta
+| Vendor.eventType =  "user.authentication.auth_via_mfa" 
+| (Vendor.outcome.result = "UNANSWERED" or Vendor.outcome.result = "ABANDONED")
+
+--On Factor Resets
+#Vendor = okta
+| Vendor.eventType = "user.mfa.factor.reset_all"
+
+--Rejected MFA Pushes
+#Vendor = okta
+| Vendor.eventType = "user.authentication.auth_via_mfa" 
+| Vendor.debugContext.debugData.pushOnlyResponseType = "OV_RESPONSE_DENY"
+
+--Rich Client Abuse
+#Vendor = okta
+| Vendor.eventType = "user.authentication.auth_via_richclient"
+
+--Sign-in Attempts from Proxies
+#Vendor = okta
+| Vendor.eventType =  "user.session.start" 
+| Vendor.securityContext.isProxy = "true"

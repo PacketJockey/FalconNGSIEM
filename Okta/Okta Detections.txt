@@ -1,0 +1,123 @@
+--Access to Admin Console Denide
+| Vendor.eventType =  "user.session.access_admin_app" 
+| Vendor.outcome.result = "FAILURE"
+
+--Authentication Policy MFA Downgrade
+::PENDING::
+
+--Detect AITM Phishing using FastPas
+#Vendor = okta
+| Vendor.eventType = "user.authentication.auth_via_mfa" 
+| Vendor.outcome.result = "FAILURE" 
+| Vendor.outcome.reason = "FastPass declined phishing attempt"
+
+--Device Enrolled with NonStandard Hostname
+::PENDING::
+
+--Device Registered to Multiple Users
+::PENDING::
+
+--Fastpass Auth via Suspect Binary (Not Tested) 
+| Vendor.debugContext.debugData.factor = "SIGNED_NONCE" 
+| Vendor.outcome.result = "SUCCESS" 
+| Vendor.authenticationContext.authenticatorContext.bindingMethod = "LOOPBACK" 
+| (Vendor.authenticationContext.authenticatorContext.validationStatus = "NO_SIGNATURE" or  
+!(Vendor.authenticationContext.authenticatorContext.binaryIdentifier = /Edge/i or Vendor.authenticationContext.authenticatorContext.binaryIdentifier = /Chrome/i or Vendor.authenticationContext.authenticatorContext.binaryIdentifier = /firefox/i or Vendor.authenticationContext.authenticatorContext.binaryIdentifier = /Safari/i or Vendor.authenticationContext.authenticatorContext.binaryIdentifier = /Brave/ or Vendor.authenticationContext.authenticatorContext.binaryIdentifier = /Microsoft/i))
+
+--ITP Brute Force (Not Tested)
+#Vendor = okta
+| Vendor.eventType =  "user.risk.detect"
+| in(field=Vendor.debugContext.debugData.risk, values = ["*detectionName=Brute Force Attack*", "*reasons=\"MFA brute force\"*"])
+
+--Log Stream Tampering (Not Tested) 
+#Vendor = okta
+| Vendor.eventType = /^system\.log_stream\.lifecycle/i
+
+--Missmatch between source and response Okta Verify Push
+::PENDING::
+
+--Multiple Failed Requests to Access Okta Applications
+::PENDING::
+
+--New AD Agent Created
+#Vendor = okta
+| Vendor.eventType =  "system.agent.ad.create"
+
+--New IDP Created
+#Vendor = okta
+| Vendor.eventType = "system.idp.lifecycle.create"
+
+--New Super Admin Added or Removed (Not Working) 
+#Vendor = okta
+| Vendor.eventType = /^user.account.privilege/
+| in(Vendor.debugData.privilegeRevoked,values=["*Super administrator*"])  | in(Vendor.debug.privilegeGranted,values=["*Super administrator*"]) )
+
+--OAUTH Client Secret Read
+#Vendor = okta
+| Vendor.eventType = app.oauth2.client.read_client_secret
+
+--OAUTH Mismatched Redirect URI
+#Vendor = okta
+| Vendor.eventType = "app.oauth2.token.grant"
+| Vendor.outcome.reason = "mismatched_redirect_uri"
+| Vendor.outcome.result = FAILURE
+
+--OPA Password Changed OOB
+#Vendor = okta
+| Vendor.eventType = pam.server_account.password_change.out_of_band
+
+--Phone Number Registered to Multiple Users
+#Vendor = okta
+| groupBy([Vendor.MobilePhone.alternateId],function=count(Vendor.User.alternateId,distinct=true)) | _count >=2
+
+--Rapid Application Access
+::PENDING::
+
+--Request to Access Admin Console from new device or IP
+#Vendor = okta
+| Vendor.eventType = "policy.evaluate_sign_on" and Vendor.target[0].displayName = "Okta Admin Console"
+((Vendor.debugContext.debugData.behaviors = /New Device=POSITIVE/ and Vendor.debugContext.debugData.behaviors = /New IP=POSITIVE/) OR (Vendor.debugContext.debugData.logOnlySecurityData = /\"New Device\":\"POSITIVE\"/ or Vendor.debugContext.debugData.logOnlySecurityData = /\"New IP\":\"POSITIVE\"/))
+
+--Suspicious MFA Abandonment
+########################################
+# 5 Abandonments single user/single IP #
+########################################
+#Vendor = okta
+| Vendor.eventType = user.authentication.auth_via_mfa | in(field=Vendor.outcome.result, values=["UNANSWERED", "ABANDONED"])
+| groupBy([client.user.name,client.ip],function=count()) | _count > 5
+
+########################################
+# Single IP for five unique user IDs   #
+########################################
+#Vendor = okta
+| Vendor.eventType = user.authentication.auth_via_mfa | in(field=Vendor.outcome.result, values=["UNANSWERED", "ABANDONED"])
+| groupBy([client.ip],function=count(client.user.name,distinct=true)) | _count > 1
+
+########################################
+# Abandondment from Proxy IP Address   #
+########################################
+#Vendor = okta
+| Vendor.eventType = user.authentication.auth_via_mfa | in(field=Vendor.outcome.result, values=["UNANSWERED", "ABANDONED"])
+| Vendor.securityContext.isProxy = true
+| groupBy([client.user.name,client.ip],function=count()) 
+
+--Suspicious use of an Okta Session Cookie
+::PENDING::
+
+--Threat Insight high Unknown Users
+#Vendor = okta
+| Vendor.eventType = "security.threat.detected" 
+| Vendor.outcome.reason = /Login failures with high unknown users count/i
+
+--Threat Insight Password Spray
+#Vendor = okta
+| Vendor.eventType = "security.threat.detected" 
+| Vendor.outcome.reason = /Password Spray/i
+
+--User Denied Access due to Session Binding
+#Vendor = okta
+| Vendor.eventType = "security.session.detect_client_roaming"
+
+--User Reported Suspicious Activity
+#Vendor = okta
+| Vendor.eventType = "user.account.report_suspicious_activity_by_enduser"
